@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "tailwindcss-primeui";
+
+:root {
+    line-height: initial;
+}
