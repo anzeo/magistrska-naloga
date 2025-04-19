@@ -2,11 +2,11 @@ import json
 import os
 import joblib
 import numpy as np
-import yaml
 import classla
 from nltk.corpus import stopwords
 from scipy.sparse import save_npz, load_npz
-from sklearn.feature_extraction.text import TfidfVectorizer
+
+# from tfidf_embeddings import __file__ as embeddings_base_path
 
 # Download Slovene model if not available
 classla.download('sl')
@@ -14,6 +14,7 @@ nlp = classla.Pipeline('sl', processors='tokenize,pos,lemma')
 stop_words = set(stopwords.words('slovene'))
 
 # File paths for storing embeddings
+# BASE_PATH = os.path.dirname(embeddings_base_path)
 BASE_PATH = "tfidf_embeddings"
 EMBEDDINGS_FILE = f"{BASE_PATH}/embeddings.npz"
 VECTORIZER_FILE = f"{BASE_PATH}/vectorizer.pkl"
@@ -59,8 +60,7 @@ class EmbeddingManager:
     def load_embeddings(self):
         """Ensures embeddings are stored and loads them."""
         if not os.path.exists(EMBEDDINGS_FILE):
-            print(f"Missing embeddings. Generating now...")
-            prepare_data()
+            print(f"Missing embeddings. Please run store_embeddings.py first...")
         self.get_vectorizer()
         self.get_tfidf_matrix()
         self.get_metadata()
@@ -87,43 +87,3 @@ def preprocess(text):
         if (token.words[0].lemma.isalpha() or token.words[0].lemma.isdigit())
         and token.words[0].lemma.lower() not in stop_words
     )
-
-
-def process_section(data, key):
-    """Processes either 'cleni' or 'tocke' and returns preprocessed text + metadata."""
-    metadata, preprocessed_texts = [], []
-    for d in data[key]:
-        if key == "cleni":
-            text = (
-                    d['poglavje']['naslov'] + "\n" +
-                    (d['oddelek']['naslov'] + "\n" if d['oddelek'] else '') +
-                    d['naslov'] + "\n" +
-                    d['vsebina']
-            )
-        else:
-            text = (d['vsebina'])
-
-        preprocessed_text = preprocess(text)
-
-        preprocessed_texts.append(preprocessed_text)
-        metadata.append({"id": d['id_elementa'], "type": key, "raw_text": text})
-    return {"metadata": metadata, "preprocessed_embeddings": preprocessed_texts}
-
-
-def prepare_data():
-    """Reads YAML file, preprocesses text, and stores TF-IDF embeddings."""
-    with open("ai_act.yaml", "r") as file:
-        data = yaml.safe_load(file)
-
-    datasets = {key: process_section(data, key) for key in ["cleni", "tocke"]}
-
-    all_texts, all_metadata = [], []
-    for key, values in datasets.items():
-        all_texts += values["preprocessed_embeddings"]
-        all_metadata += values["metadata"]
-
-    # Train a joint model for both 'cleni' and 'tocke'
-    vectorizer = TfidfVectorizer(norm="l2")
-    tfidf_matrix = vectorizer.fit_transform(all_texts)
-
-    EmbeddingManager().get_instance().save_data(vectorizer, tfidf_matrix, all_metadata)
