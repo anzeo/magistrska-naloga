@@ -1,5 +1,3 @@
-import dotenv
-
 from typing import TypedDict, Annotated, Literal
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
@@ -15,8 +13,6 @@ from pydantic import BaseModel, Field
 
 from TFIDFRetriever import TFIDFRetriever
 from ai_act_summary import AI_ACT_SUMMARY
-
-dotenv.load_dotenv()
 
 chat_model = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, verbose=True)
 
