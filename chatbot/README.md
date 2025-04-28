@@ -57,8 +57,7 @@ V tem načinu se zgodovina pogovora persistira v SQLite bazo in se ohrani tudi m
 make store
 ```
 
-Vektorji bodo shranjeni v direktorij:  
-`src/retriever/tfidf_embeddings/`
+Vektorji bodo shranjeni v direktorij: `src/retriever/tfidf_embeddings/`
 
 ---
 
@@ -66,6 +65,7 @@ Vektorji bodo shranjeni v direktorij:
 
 Glavne komponente projekta so organizirane v naslednje module:
 
+- `data/` - vsebina akta, razdeljena na manjše enote
 - `src/core/` – logika pogovornega robota
 - `src/retriever/` – retrieval sistem (iskanje relevantnih vsebin)
 - `src/api/` – FastAPI vmesnik
@@ -86,5 +86,5 @@ Glavne komponente projekta so organizirane v naslednje module:
 
 - Če se lokacije datotek spremenijo, preveri poti v `src/config.py`.
 - Projekt uporablja **trajen spomin** za shranjevanje zgodovine klepeta preko **SQLite baze**. 
-Ob zagonu katere koli izmed zgornjih skript se v korenskem direktoriju samodejno ustvari mapa `db`, ki vsebuje vse potrebne datoteke za delovanje baze.
+Ob zagonu katere koli izmed zgornjih skript se v korenskem direktoriju samodejno ustvari mapa `db/`, ki vsebuje vse potrebne datoteke za delovanje baze.
 - Zagon API vmesnika uporablja **FastAPI**.
