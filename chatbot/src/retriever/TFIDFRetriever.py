@@ -4,7 +4,7 @@ from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
-from search import search_documents
+from src.retriever.search import search_documents
 
 
 class TFIDFRetriever(BaseRetriever):

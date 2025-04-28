@@ -1,7 +1,8 @@
 import yaml
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from util import EmbeddingManager, preprocess
+from src.config import AI_ACT_YAML_PATH
+from src.retriever.util import EmbeddingManager, preprocess
 
 
 def process_section(data, key):
@@ -27,8 +28,10 @@ def process_section(data, key):
 
 def prepare_data():
     """Reads YAML file, preprocesses text, and stores TF-IDF embeddings."""
-    with open("../data/ai_act.yaml", "r") as file:
+    with open(AI_ACT_YAML_PATH, "r") as file:
         data = yaml.safe_load(file)
+
+    print("Storing embeddings...")
 
     datasets = {key: process_section(data, key) for key in ["cleni", "tocke"]}
 
@@ -42,6 +45,8 @@ def prepare_data():
     tfidf_matrix = vectorizer.fit_transform(all_texts)
 
     EmbeddingManager().get_instance().save_data(vectorizer, tfidf_matrix, all_metadata)
+
+    print("Embeddings saved!")
 
 if __name__ == "__main__":
     prepare_data()

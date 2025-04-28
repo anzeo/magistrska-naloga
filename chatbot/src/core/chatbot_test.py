@@ -6,7 +6,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_openai import ChatOpenAI
 
-from chatbot.src.TFIDFRetriever import TFIDFRetriever
+from src.retriever.TFIDFRetriever import TFIDFRetriever
 
 dotenv.load_dotenv()
 

@@ -6,19 +6,12 @@ import classla
 from nltk.corpus import stopwords
 from scipy.sparse import save_npz, load_npz
 
-# from tfidf_embeddings import __file__ as embeddings_base_path
+from src.config import EMBEDDINGS_PATH, METADATA_PATH, VECTORIZER_PATH
 
 # Download Slovene model if not available
 classla.download('sl')
 nlp = classla.Pipeline('sl', processors='tokenize,pos,lemma')
 stop_words = set(stopwords.words('slovene'))
-
-# File paths for storing embeddings
-# BASE_PATH = os.path.dirname(embeddings_base_path)
-BASE_PATH = "tfidf_embeddings"
-EMBEDDINGS_FILE = f"{BASE_PATH}/embeddings.npz"
-VECTORIZER_FILE = f"{BASE_PATH}/vectorizer.pkl"
-METADATA_FILE = f"{BASE_PATH}/metadata.json"
 
 
 class EmbeddingManager:
@@ -41,25 +34,25 @@ class EmbeddingManager:
     def get_vectorizer(self):
         """Loads vectorizer from disk or cache."""
         if self._vectorizer is None:
-            self._vectorizer = joblib.load(VECTORIZER_FILE)
+            self._vectorizer = joblib.load(VECTORIZER_PATH)
         return self._vectorizer
 
     def get_tfidf_matrix(self):
         """Loads TF-IDF matrix from disk or cache."""
         if self._tfidf_matrix is None:
-            self._tfidf_matrix = load_npz(EMBEDDINGS_FILE)
+            self._tfidf_matrix = load_npz(EMBEDDINGS_PATH)
         return self._tfidf_matrix
 
     def get_metadata(self):
         """Loads metadata from disk or cache."""
         if self._metadata is None:
-            with open(METADATA_FILE, "r") as f:
+            with open(METADATA_PATH, "r") as f:
                 self._metadata = np.array(json.load(f))
         return self._metadata
 
     def load_embeddings(self):
         """Ensures embeddings are stored and loads them."""
-        if not os.path.exists(EMBEDDINGS_FILE):
+        if not os.path.exists(EMBEDDINGS_PATH):
             print(f"Missing embeddings. Please run store_embeddings.py first...")
         self.get_vectorizer()
         self.get_tfidf_matrix()
@@ -68,12 +61,12 @@ class EmbeddingManager:
     @staticmethod
     def save_data(vectorizer, tfidf_matrix, metadata):
         """Saves vectorizer, TF-IDF matrix, and metadata."""
-        os.makedirs(os.path.dirname(EMBEDDINGS_FILE), exist_ok=True)
+        os.makedirs(os.path.dirname(EMBEDDINGS_PATH), exist_ok=True)
 
-        save_npz(EMBEDDINGS_FILE, tfidf_matrix)
-        joblib.dump(vectorizer, VECTORIZER_FILE)
+        save_npz(EMBEDDINGS_PATH, tfidf_matrix)
+        joblib.dump(vectorizer, VECTORIZER_PATH)
 
-        with open(METADATA_FILE, "w") as f:
+        with open(METADATA_PATH, "w") as f:
             json.dump(metadata, f)
 
 

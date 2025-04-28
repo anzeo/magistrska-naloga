@@ -4,7 +4,7 @@ import numpy as np
 from langchain_core.documents import Document
 from sklearn.metrics.pairwise import cosine_similarity
 
-from util import EmbeddingManager, preprocess
+from src.retriever.util import EmbeddingManager, preprocess
 
 
 def search(query, top_n=None):
