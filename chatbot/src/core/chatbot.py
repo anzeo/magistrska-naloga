@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import TypedDict, Annotated
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
@@ -5,6 +6,7 @@ from langchain_core.output_parsers import PydanticOutputParser, StrOutputParser
 from langchain_core.prompts import PromptTemplate, MessagesPlaceholder, ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.constants import END
 from langgraph.graph import StateGraph, add_messages
@@ -13,6 +15,16 @@ from pydantic import BaseModel, Field
 from src.core.ai_act_summary import AI_ACT_SUMMARY
 from src import sqlite_conn
 from src.retriever.TFIDFRetriever import TFIDFRetriever
+
+
+# ------------ Enum for memory type ------------
+
+class MemoryType(str, Enum):
+    MEMORY = "memory"
+    SQLITE = "sqlite"
+
+
+# ----------------------------------------------
 
 chat_model = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, verbose=True)
 
@@ -496,7 +508,7 @@ def answer_validation_router(state):
         return "Invalid"
 
 
-def build_chatbot():
+def build_chatbot(memory_type: MemoryType = MemoryType.MEMORY):
     workflow = StateGraph(AgentState)
 
     workflow.add_node("Classify_Query_Relevance", classify_query_relevance)
@@ -533,8 +545,10 @@ def build_chatbot():
     workflow.add_edge("Invalid_RAG_Answer", END)
     workflow.add_edge("Valid_RAG_Answer", END)
 
-    # memory = MemorySaver() # Chat history persists only on current script run
-    memory = SqliteSaver(sqlite_conn)  # Chat history persists over multiple runs
+    if memory_type == MemoryType.MEMORY:
+        memory = MemorySaver()  # Chat history persists only on current script run
+    else:  # MemoryType.SQLITE
+        memory = SqliteSaver(sqlite_conn)  # Chat history persists over multiple runs
 
     chatbot = workflow.compile(checkpointer=memory)
 

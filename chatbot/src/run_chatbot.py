@@ -2,9 +2,9 @@
 Script that runs chatbot in terminal
 """
 from langchain_core.messages import HumanMessage
-from src.core.chatbot import build_chatbot
+from src.core.chatbot import build_chatbot, MemoryType
 
-chatbot = build_chatbot()
+chatbot = build_chatbot(MemoryType.MEMORY)
 
 # try:
 #     png_data = chatbot.get_graph().draw_mermaid_png(draw_method=MermaidDrawMethod.API)
