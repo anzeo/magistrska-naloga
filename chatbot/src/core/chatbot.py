@@ -26,7 +26,8 @@ class MemoryType(str, Enum):
 
 # ----------------------------------------------
 
-chat_model = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, verbose=True)
+# chat_model = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, verbose=True)
+chat_model = ChatOpenAI(model="gpt-4o-mini", temperature=0, verbose=True)
 
 
 class Top3Response(BaseModel):
@@ -108,7 +109,7 @@ def classify_query_relevance(state):
         1. Analiziraj zadnji uporabnikov poziv.
         2. Če je potrebno, upoštevaj preteklo zgodovino pogovora za pravilno razumevanje konteksta.
         3. Razvrsti zadnje vprašanje v eno izmed dveh kategorij:
-            - "AI Act" – če je vprašanje kakorkoli povezano z Evropskim zakonom/uredbo o umetni inteligenci.
+            - "AI Act" – če je vprašanje kakorkoli povezano z Evropskim zakonom/uredbo o umetni inteligenci. Za lažje odločanje je spodaj na voljo povzetek zakona.
             - "Not Related" – če vprašanje ni povezano z AI Act, ali je le splošen komentar/besedilo brez povezave.
 
         Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
@@ -116,14 +117,14 @@ def classify_query_relevance(state):
         Če odgovor vsebuje karkoli drugega kot JSON, je NEVELJAVEN.
 
         ---
+        
+        Zgodovina pogovora:
+        {chat_history}
+        
+        ---
 
         Povzetek zakona o umetni inteligenci:
         {ai_act_summary}
-
-        ---
-
-        Zgodovina pogovora:
-        {chat_history}
 
         ---
 
