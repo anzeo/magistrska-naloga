@@ -15,7 +15,7 @@ def get_chats():
 
 
 def get_chat_by_id(chat_id):
-    cursor.execute("SELECT * FROM chats WHERE chat_id = ?", (chat_id,))
+    cursor.execute("SELECT * FROM chats WHERE id = ?", (chat_id,))
     result = cursor.fetchone()
 
     return result
@@ -32,7 +32,7 @@ def create_chat(name):
 
     try:
         cursor.execute(
-            "INSERT INTO chats (chat_id, name) VALUES (?, ?)",
+            "INSERT INTO chats (id, name) VALUES (?, ?)",
             (chat_id, name)
         )
         sqlite_conn.commit()
@@ -55,7 +55,7 @@ def update_chat(chat_id, updates):
         sql = f"""
                 UPDATE chats
                 SET {set_clause}, updated_at = CURRENT_TIMESTAMP
-                WHERE chat_id = ?
+                WHERE id = ?
             """
         cursor.execute(sql, values)
         sqlite_conn.commit()

@@ -20,7 +20,7 @@ def init_db():
         else:
             cursor.execute("""
             CREATE TABLE chats (
-                chat_id TEXT UNIQUE PRIMARY KEY,
+                id TEXT UNIQUE PRIMARY KEY,
                 name TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

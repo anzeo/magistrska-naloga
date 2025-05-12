@@ -4,12 +4,25 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import TypeAdapter
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.api import repository
 from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse, ChatHistoryEntry
 from src.db import init_db
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5173"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,      # Use ["*"] to allow all (dev only)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
