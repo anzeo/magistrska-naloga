@@ -2,10 +2,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
+from pydantic import TypeAdapter
 
 from src.api import repository
-from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse
+from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse, ChatHistoryEntry
 from src.db import init_db
 
 app = FastAPI()
@@ -52,11 +53,25 @@ async def update_chat(chat_id: str, chat_body: ChatUpdate):
 
 @app.get("/chat-history/{chat_id}")
 async def get_chat_history(chat_id: str):
-    state_by_chat_id = SqliteSaver(sqlite_conn).get({"configurable": {"thread_id": chat_id}})
-    if state_by_chat_id is None:
-        return []
-    return state_by_chat_id.get("channel_values", {}).get("messages", [])
+    chat_history_adapter = TypeAdapter(ChatHistoryEntry)
+    chat_history = repository.get_chat_history_by_id(chat_id)
 
+    # Group into (human, ai) pairs
+    paired_history = []
+    i = 0
+    while i < len(chat_history) - 1:
+        human = chat_history[i]
+        ai = chat_history[i + 1]
+
+        if isinstance(human, HumanMessage) and isinstance(ai, AIMessage):
+            validated_human_entry = chat_history_adapter.validate_python({**human.__dict__, "chat_id": chat_id})
+            validated_ai_entry = chat_history_adapter.validate_python({**ai.__dict__, "chat_id": chat_id})
+            paired_history.append((validated_human_entry, validated_ai_entry))
+            i += 2  # advance to next pair
+        else:
+            i += 1  # skip and check next
+
+    return paired_history
 
 @app.delete("/chat-history/{chat_id}")
 async def delete_chat_history_by_id(chat_id: str):

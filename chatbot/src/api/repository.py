@@ -74,3 +74,9 @@ def delete_chat_history_by_id(chat_id):
     except sqlite3.Error as e:
         print(f"SQLite error during chat history deletion: {e}")
         return False
+
+def get_chat_history_by_id(chat_id):
+    state_by_chat_id = SqliteSaver(sqlite_conn).get({"configurable": {"thread_id": chat_id}})
+    if state_by_chat_id is None:
+        return []
+    return state_by_chat_id.get("channel_values", {}).get("messages", [])
