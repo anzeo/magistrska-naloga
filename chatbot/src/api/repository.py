@@ -4,7 +4,7 @@ from sqlite3 import Error
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from src import cursor, sqlite_conn
+from src.db import cursor, sqlite_conn
 
 
 def get_chats():

@@ -1,19 +1,25 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
 
-from src import sqlite_conn
 from src.api import repository
 from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse
-from src.core.chatbot import build_chatbot, MemoryType
+from src.db import init_db
 
-chatbot = build_chatbot(MemoryType.SQLITE)
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+@asynccontextmanager
+async def lifespan(fastapi_app: FastAPI):
+    init_db()
+
+    from src.core.chatbot import build_chatbot, MemoryType
+    fastapi_app.state.chatbot = build_chatbot(MemoryType.SQLITE)
+
+    yield
+
+app.router.lifespan_context = lifespan
 
 @app.get("/chats")
 async def get_chats():
@@ -92,7 +98,7 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
     }
 
     config = {"configurable": {"thread_id": chat_id}}
-    chatbot_response = chatbot.invoke(inputs, config)
+    chatbot_response = app.state.chatbot.invoke(inputs, config)
 
     return InvokeChatbotResponse(
         chat_id=chat_id,

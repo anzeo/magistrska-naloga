@@ -13,7 +13,7 @@ from langgraph.graph import StateGraph, add_messages
 from pydantic import BaseModel, Field
 
 from src.core.ai_act_summary import AI_ACT_SUMMARY
-from src import sqlite_conn
+from src.db import sqlite_conn
 from src.retriever.TFIDFRetriever import TFIDFRetriever
 
 
