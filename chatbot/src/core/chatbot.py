@@ -44,12 +44,6 @@ class QueryClassificationParser(BaseModel):
     Reasoning: str = Field(description="Utemeljitev za izbiro kategorije")
 
 
-class RelevantPartsParser(BaseModel):
-    AnswerIncluded: str = Field(description='Odgovori izključno z "Da" ali "Ne"')
-    RelevantParts: list[str] = Field(
-        description='Seznam odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])')
-
-
 class RelevantPassage(BaseModel):
     id: str
     text: list[str]
@@ -81,7 +75,6 @@ retriever = TFIDFRetriever(k=10)
 query_history_relation_parser = PydanticOutputParser(pydantic_object=QueryHistoryRelationParser)
 query_classification_parser = PydanticOutputParser(pydantic_object=QueryClassificationParser)
 top_3_parser = PydanticOutputParser(pydantic_object=Top3Response)
-relevant_parts_parser = PydanticOutputParser(pydantic_object=RelevantPartsParser)
 rag_answer_parser = PydanticOutputParser(pydantic_object=RAGAnswerParser)
 answer_validation_parser = PydanticOutputParser(pydantic_object=AnswerValidationParser)
 
@@ -491,9 +484,10 @@ def valid_rag_answer(state):
     print("-- Appending Valid RAG Answer To Chat History --")
 
     valid_answer = state["answer"]
+    relevant_part_texts = state["relevant_part_texts"]
 
     return {
-        "messages": [AIMessage(content=valid_answer)]  # Append valid RAG answer to chat history
+        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": relevant_part_texts})]  # Append valid RAG answer to chat history
     }
 
 

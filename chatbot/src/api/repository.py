@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 from sqlite3 import Error
 
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -18,6 +19,27 @@ def get_chat_by_id(chat_id):
     result = cursor.fetchone()
 
     return result
+
+
+def create_chat(name):
+    # Generate a unique chat ID and ensure it does not already exist in the database.
+    chat_id = str(uuid.uuid4())
+    chat_exists = get_chat_by_id(chat_id) is not None
+    # This should not happen, but in case it does, we generate a new, nonexistent ID
+    while chat_exists:
+        chat_id = str(uuid.uuid4())
+        chat_exists = get_chat_by_id(chat_id) is not None
+
+    try:
+        cursor.execute(
+            "INSERT INTO chats (chat_id, name) VALUES (?, ?)",
+            (chat_id, name)
+        )
+        sqlite_conn.commit()
+
+        return chat_id
+    except Error as e:
+        raise e
 
 
 def update_chat(chat_id, updates):
