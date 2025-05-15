@@ -227,27 +227,6 @@ def rephrase_query(state):
 
     prompt = PromptTemplate.from_template(template)
 
-    # prompt = ChatPromptTemplate.from_messages([
-    #     MessagesPlaceholder(variable_name="chat_history"),
-    #     ("system", """
-    #         Tvoja naloga je:
-    #
-    #         - Preoblikuj zadnji uporabnikov poziv v obliko, ki je čim bolj primerna za iskanje informacij v podatkovni bazi.
-    #         - Odstrani vljudnostne fraze (npr. "živjo", "prosim", "hvala").
-    #         - Če je poziv nejasen, ga naredi bolj specifičnega.
-    #         - Če je poziv že jasen, ga pusti nespremenjenega.
-    #
-    #         STROGA NAVODILA:
-    #         - NE odgovarjaj na vprašanje uporabnika.
-    #         - NE dodajaj nobenih dodatnih informacij ali razlag.
-    #         - Samo vrni preoblikovano ali nespremenjeno besedilo poziva.
-    #         - Odgovori samo z izboljšanim pozivom.
-    #
-    #         Če ne upoštevaš teh pravil, je tvoj odgovor neveljaven.
-    #     """),
-    #     query
-    # ])
-
     chain = prompt | chat_model | StrOutputParser()
 
     resp = chain.invoke({
@@ -366,6 +345,7 @@ def rag_answer_function(state):
     print("-- Calling LLM For Answer From RAG --")
 
     query = state["query"]
+    original_query = state["messages"][-1]
 
     template = """
         Spodaj so podani dokumenti, ki naj bi bili najbolj relevantni glede na uporabnikovo vprašanje. Na njihovi podlagi oblikuj razumljiv odgovor na uporabnikovo vprašanje.
@@ -378,16 +358,27 @@ def rag_answer_function(state):
         Poleg samega odgovora vrni tudi seznam najpomembnejših odlomkov iz dokumentov, ki so neposredno pripomogli k oblikovanju odgovora. Vsak odlomek mora biti:
         - **Dobesedno prepisan iz dokumenta**, brez sprememb, povzemanja ali sklepanja.
         - Označen z `id` dokumenta, iz katerega izvira.
+        
+        ---
+        
+        Uporabnikov poziv (izvoren):
+        <originalen_poziv>
+        {original_query}
+        </originalen_poziv>
+        
+        Preoblikovan poziv (optimiziran za iskanje):
+        <preoblikovan_poziv>
+        {query}
+        </preoblikovan_poziv>
 
-        Uporabnikovo vprašanje: 
-        <vprašanje>  
-        {query}  
-        </vprašanje>
-
+        ---
+        
         Relevantni dokumenti v pomoč pri tvorjenju odgovora:
         <dokumenti>
         {top_3}
         </dokumenti>
+        
+        ---
 
         Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
 
@@ -395,12 +386,13 @@ def rag_answer_function(state):
         {format_instructions}
     """
 
-    prompt = PromptTemplate(template=template, input_variables=["query", "top_3"]).partial(
+    prompt = PromptTemplate(template=template, input_variables=["original_query", "query", "top_3"]).partial(
         format_instructions=rag_answer_parser.get_format_instructions())
 
     chain = prompt | chat_model | rag_answer_parser
 
-    response = chain.invoke({"query": query, "top_3": get_context(state["top_3"])})
+    response = chain.invoke(
+        {"original_query": original_query.content, "query": query, "top_3": get_context(state["top_3"])})
 
     # print("ANSWER:")
     # print(response.Answer)
@@ -487,7 +479,8 @@ def valid_rag_answer(state):
     relevant_part_texts = state["relevant_part_texts"]
 
     return {
-        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": relevant_part_texts})]  # Append valid RAG answer to chat history
+        # Append valid RAG answer to chat history
+        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": relevant_part_texts})]
     }
 
 
