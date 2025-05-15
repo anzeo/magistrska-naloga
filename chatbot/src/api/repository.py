@@ -24,11 +24,9 @@ def get_chat_by_id(chat_id):
 def create_chat(name):
     # Generate a unique chat ID and ensure it does not already exist in the database.
     chat_id = str(uuid.uuid4())
-    chat_exists = get_chat_by_id(chat_id) is not None
     # This should not happen, but in case it does, we generate a new, nonexistent ID
-    while chat_exists:
+    while get_chat_by_id(chat_id) is not None:
         chat_id = str(uuid.uuid4())
-        chat_exists = get_chat_by_id(chat_id) is not None
 
     try:
         cursor.execute(
@@ -65,15 +63,28 @@ def update_chat(chat_id, updates):
         raise e
 
 
-def delete_chat_history_by_id(chat_id):
+def delete_chat_by_id(chat_id):
+    try:
+        cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+        # Also delete chat history and don't commit yet
+        delete_chat_history_by_id(chat_id, commit=False)
+        # Commit the changes to the database after both deletions were successful
+        sqlite_conn.commit()
+    except sqlite3.Error as e:
+        print(f"SQLite error during chat deletion: {e}")
+        raise e
+
+
+def delete_chat_history_by_id(chat_id, commit=True):
     try:
         cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (chat_id,))
         cursor.execute("DELETE FROM writes WHERE thread_id = ?", (chat_id,))
-        sqlite_conn.commit()
-        return True
+        if commit:
+            sqlite_conn.commit()
     except sqlite3.Error as e:
         print(f"SQLite error during chat history deletion: {e}")
-        return False
+        raise e
+
 
 def get_chat_history_by_id(chat_id):
     state_by_chat_id = SqliteSaver(sqlite_conn).get({"configurable": {"thread_id": chat_id}})
