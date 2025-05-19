@@ -4,7 +4,7 @@
       <div v-if="!chatId" class="new-chat-info-container text-center">
         <h2 class="text-2xl font-semibold">Kako ti lahko pomagam?</h2>
         <p class="text-sm text-gray-600">
-          Sem pogovorni robot specializiran na področju akta o umetni
+          Sem pogovorni robot specializiran na področju Akta o umetni
           inteligenci.
         </p>
       </div>

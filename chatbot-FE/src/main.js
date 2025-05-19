@@ -8,11 +8,14 @@ import VueAxios from "vue-axios";
 
 import "primeicons/primeicons.css";
 import "./styles/app.css";
+import { ConfirmationService, ToastService } from "primevue";
 
 const app = createApp(App);
 
 app.use(router);
 app.use(VueAxios, axios);
+app.use(ToastService);
+app.use(ConfirmationService);
 
 app.config.globalProperties.$config = window.config;
 app.config.globalProperties.$axios = axios;
