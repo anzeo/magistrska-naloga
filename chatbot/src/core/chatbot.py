@@ -319,6 +319,7 @@ def llm_function(state):
 
     chat_history = state["messages"][:-1]
     query = state["messages"][-1]
+    human_msg_id = query.id
 
     prompt = ChatPromptTemplate.from_messages([
         MessagesPlaceholder(variable_name="chat_history"),
@@ -337,7 +338,7 @@ def llm_function(state):
     return {
         "answer": response,
         "relevant_part_texts": [],
-        "messages": [AIMessage(content=response)]
+        "messages": [AIMessage(content=response, additional_kwargs={"parent_id": human_msg_id})]
     }
 
 
@@ -453,6 +454,7 @@ def invalid_rag_answer(state):
     print("-- Calling LLM For Invalid Answer --")
 
     query = state["query"]
+    human_msg_id = state["messages"][-1].id
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", """
@@ -468,7 +470,8 @@ def invalid_rag_answer(state):
     return {
         "answer": response,  # Overwrite RAG answer with new one
         "relevant_part_texts": [],  # We don't need this, since the answer obtained from those texts was invalid
-        "messages": [AIMessage(content=response)]  # Append to chat history
+        "messages": [AIMessage(content=response, additional_kwargs={"parent_id": human_msg_id})]
+        # Append to chat history
     }
 
 
@@ -477,10 +480,12 @@ def valid_rag_answer(state):
 
     valid_answer = state["answer"]
     relevant_part_texts = state["relevant_part_texts"]
+    human_msg_id = state["messages"][-1].id
 
     return {
         # Append valid RAG answer to chat history
-        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": relevant_part_texts})]
+        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": relevant_part_texts},
+                               additional_kwargs={"parent_id": human_msg_id})]
     }
 
 

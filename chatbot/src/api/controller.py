@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from typing import List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -8,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 
 from src.api import repository
-from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse, ChatHistoryEntry
+from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse, ChatHistoryEntry, \
+    ChatHistoryTurn
 from src.core.util import get_title_from_query
 from src.db import init_db
 
@@ -95,25 +97,29 @@ async def delete_chat_by_id(chat_id: str):
 
 
 @app.get("/chat-history/{chat_id}")
-async def get_chat_history(chat_id: str):
+async def get_chat_history(chat_id: str) -> List[ChatHistoryTurn]:
     try:
         chat_history_adapter = TypeAdapter(ChatHistoryEntry)
         chat_history = repository.get_chat_history_by_id(chat_id)
 
-        # Group into (human, ai) pairs
-        paired_history = []
-        i = 0
-        while i < len(chat_history) - 1:
-            human = chat_history[i]
-            ai = chat_history[i + 1]
+        human_messages = {}
+        ai_messages = []
 
-            if isinstance(human, HumanMessage) and isinstance(ai, AIMessage):
-                validated_human_entry = chat_history_adapter.validate_python({**human.__dict__, "chat_id": chat_id})
-                validated_ai_entry = chat_history_adapter.validate_python({**ai.__dict__, "chat_id": chat_id})
-                paired_history.append((validated_human_entry, validated_ai_entry))
-                i += 2  # advance to next pair
-            else:
-                i += 1  # skip and check next
+        for msg in chat_history:
+            if isinstance(msg, HumanMessage):
+                human_messages[msg.id] = msg
+            elif isinstance(msg, AIMessage):
+                ai_messages.append(msg)
+
+        paired_history = []
+        for ai_msg in ai_messages:
+            parent_id = ai_msg.additional_kwargs.get("parent_id")
+            if parent_id and parent_id in human_messages:
+                validated_human_entry = chat_history_adapter.validate_python(
+                    {**human_messages[parent_id].__dict__, "chat_id": chat_id})
+                validated_ai_entry = chat_history_adapter.validate_python({**ai_msg.__dict__, "chat_id": chat_id})
+
+                paired_history.append(ChatHistoryTurn(human=validated_human_entry, ai=validated_ai_entry))
 
         return paired_history
     except Exception as e:
