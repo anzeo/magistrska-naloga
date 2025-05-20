@@ -7,7 +7,7 @@
       </div>
 
       <!-- Main content area -->
-      <div class="content-container flex-1 p-4 h-screen">
+      <div class="content-container flex-1 h-screen">
         <router-view :key="$route.fullPath"></router-view>
       </div>
     </div>
