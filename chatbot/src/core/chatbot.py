@@ -8,6 +8,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.config import get_stream_writer
 from langgraph.constants import END
 from langgraph.graph import StateGraph, add_messages
 from pydantic import BaseModel, Field
@@ -91,6 +92,8 @@ def serialize_chat_history(messages):
 
 def classify_query_relevance(state):
     print("-- Checking query relevance with AI Act --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Checking query relevance with AI Act"})
 
     chat_history = state["messages"][:-1]
     query = state["messages"][-1]  # HumanMessage(content="...")
@@ -178,17 +181,23 @@ def classify_query_relevance(state):
 def relevance_router(state):
     print("-- Router --")
 
+    writer = get_stream_writer()
+
     relevance = state["relevance"]
     if relevance == 'AI Act':
         print(">> DECISION: AI Act Related")
+        writer({"intermediate_step": "DECISION: AI Act Related"})
         return "RAG Call"
     elif relevance == 'Not Related':
         print(">> DECISION: Not AI Act Related")
+        writer({"intermediate_step": "DECISION: Not AI Act Related"})
         return "LLM Call"
 
 
 def rephrase_query(state):
     print("-- Rephrasing user query into more suitable form for usage in RAG --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Rephrasing user query into more suitable form for usage in RAG"})
 
     chat_history = state["messages"][:-1]
     query = state["messages"][-1]  # HumanMessage(content="...")
@@ -245,6 +254,8 @@ def rephrase_query(state):
 
 def rag_function(state):
     print("-- Calling RAG --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Calling RAG"})
 
     query = state["query"]
 
@@ -316,6 +327,8 @@ def get_context(retrieved_docs: list[Document]):
 
 def llm_function(state):
     print("-- Calling LLM --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Calling LLM"})
 
     chat_history = state["messages"][:-1]
     query = state["messages"][-1]
@@ -344,6 +357,8 @@ def llm_function(state):
 
 def rag_answer_function(state):
     print("-- Calling LLM For Answer From RAG --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Calling LLM For Answer From RAG"})
 
     query = state["query"]
     original_query = state["messages"][-1]
@@ -409,9 +424,12 @@ def rag_answer_function(state):
 
 def validate_answer(state):
     print("-- Calling LLM To Check if RAG Answer Is Valid --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Calling LLM To Check if RAG Answer Is Valid"})
 
     answer = state["answer"]
     query = state["query"]
+    original_query = state["messages"][-1]
 
     template = """
         Si pomočnik za preverjanje ustreznosti odgovorov.
@@ -421,11 +439,24 @@ def validate_answer(state):
         Če je odgovor ustrezen, ga označi kot 'Valid'. Če ni, označi kot 'Invalid'.
         NE ODGOVARJAJ NIČESAR DRUGEGA razen pravilnega JSON zapisa, v obliki kot je navedena spodaj v navodilih za strukturiranje odgovora.
 
-        Odgovor:
-        \"\"\"{answer}\"\"\"
+        ---
+        
+        Uporabnikov poziv (izvoren):
+        <originalen_poziv>
+        {original_query}
+        </originalen_poziv>
+        
+        Preoblikovan poziv (optimiziran za iskanje):
+        <preoblikovan_poziv>
+        {query}
+        </preoblikovan_poziv>
+        
+        ---
 
-        Uporabnikovo vprašanje:
-        \"\"\"{query}\"\"\"
+        Odgovor:
+        <odgovor>
+        {answer}
+        </odgovor>
 
         ---
         
@@ -436,14 +467,14 @@ def validate_answer(state):
         """
 
     prompt = PromptTemplate(
-        input_variables=["answer", "query"],
+        input_variables=["answer", "query", "original_query"],
         partial_variables={"format_instructions": answer_validation_parser.get_format_instructions()},
         template=template
     )
 
     chain = prompt | chat_model | answer_validation_parser
 
-    response = chain.invoke({"answer": answer, "query": query})
+    response = chain.invoke({"answer": answer, "query": query, "original_query": original_query.content})
 
     # print("\n", response, "\n")
 
