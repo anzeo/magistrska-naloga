@@ -11,6 +11,9 @@
         <router-view :key="$route.fullPath"></router-view>
       </div>
     </div>
+
+    <Toast />
+    <ConfirmDialog></ConfirmDialog>
   </div>
 </template>
 

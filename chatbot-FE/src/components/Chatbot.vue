@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full w-full py-4">
     <div
-      v-if="!chatId"
+      v-if="!chatId && !currentMessageData.isStreaming"
       class="overflow-hidden flex-1 flex justify-center items-end"
     >
       <div class="px-4">
@@ -16,30 +16,103 @@
     </div>
 
     <div
-      v-else
+      v-else-if="(!chatId && currentMessageData.isStreaming) || chatId"
       class="chat-container -mb-4 overflow-hidden flex-1 flex justify-center w-full items-end"
     >
       <div class="relative h-full w-full">
         <div class="flex flex-1 h-full overflow-y-auto flex-col">
           <div class="pb-[150px] px-4">
-            <div class="flex flex-1 h-full max-w-[1000px] mx-auto flex-col">
+            <div
+              ref="scrollContainer"
+              class="flex flex-1 h-full max-w-[1000px] mx-auto flex-col"
+            >
               <div class="flex flex-col">
-                <div v-for="chat in chatHistory" class="flex flex-col">
-                  <div class="max-w-7/12 self-end py-5">
-                    <div class="rounded-2xl bg-gray-100 px-4 py-3">
-                      <div class="whitespace-pre-wrap text-base">
-                        {{ chat.human.content }}
+                <!-- CHAT HISTORY -->
+                <div
+                  v-for="(chat, index) in chatHistory"
+                  class="flex flex-col"
+                  :style="
+                    index === chatHistory.length - 1 &&
+                    !currentMessageData.isStreaming &&
+                    chatbotInvoked
+                      ? 'min-height: calc(100dvh - 250px)'
+                      : ''
+                  "
+                >
+                  <div class="flex items-start py-5">
+                    <Avatar
+                      icon="pi pi-user"
+                      class="mr-2 mt-1 bg-primary-100"
+                      shape="square"
+                    />
+                    <div class="max-w-7/12 flex">
+                      <div class="rounded-xl bg-gray-100 px-4 py-2">
+                        <div class="whitespace-pre-wrap text-base">
+                          {{ chat.human.content }}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div class="w-full py-5">
-                    <div class="">
-                      <div class="whitespace-pre-wrap text-base text-justify">
-                        {{ chat.ai.content }}
+                  <div class="flex items-start py-5">
+                    <Avatar
+                      icon="pi pi-android"
+                      class="mr-2 bg-secondary-100"
+                      shape="square"
+                    />
+                    <div class="w-full">
+                      <div class="px-2 pl-2">
+                        <div class="whitespace-pre-wrap text-base">
+                          {{ chat.ai.content }}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                <!-- CURRENT MESSAGE -->
+                <div
+                  v-if="currentMessageData.isStreaming"
+                  style="min-height: calc(100dvh - 250px)"
+                >
+                  <div class="flex items-start py-5">
+                    <Avatar
+                      icon="pi pi-user"
+                      class="mr-2 mt-1 bg-primary-100"
+                      shape="square"
+                    />
+                    <div class="max-w-7/12 flex">
+                      <div class="rounded-xl bg-gray-100 px-4 py-2">
+                        <div class="whitespace-pre-wrap text-base">
+                          {{ currentMessageData.human }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    class="flex items-start py-5"
+                    ref="currentAIMessageContainer"
+                  >
+                    <Avatar
+                      icon="pi pi-android"
+                      class="mr-2 bg-secondary-100"
+                      shape="square"
+                    />
+                    <div class="w-full">
+                      <div class="px-2 pl-2">
+                        <div
+                          v-if="currentMessageData.aiStep !== null"
+                          class="ai-step text-shimmer whitespace-pre-wrap text-base text-justify"
+                        >
+                          {{ currentMessageData.aiStep }}
+                        </div>
+                        <div v-else class="whitespace-pre-wrap text-base">
+                          {{ currentMessageData.ai }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div ref="bottomAnchor"></div>
               </div>
             </div>
@@ -50,7 +123,11 @@
 
     <div
       class="query-input-container relative"
-      :class="chatId ? 'mb-3' : 'flex-grow-1'"
+      :class="
+        (!chatId && currentMessageData.isStreaming) || chatId
+          ? 'mb-3'
+          : 'flex-grow-1'
+      "
     >
       <div class="px-4">
         <div class="max-w-[1000px] mx-auto">
@@ -58,6 +135,8 @@
             class="bg-white border rounded-3xl border-gray-400 p-4 flex items-center gap-3 shadow-md"
           >
             <Textarea
+              v-model.trim="userQuery"
+              @keydown.enter.exact.prevent="sendMessage"
               rows="1"
               autoResize
               placeholder="Vnesite sporočilo..."
@@ -65,7 +144,12 @@
               style="max-height: 200px"
             />
 
-            <Button icon="pi pi-send" class="self-end" />
+            <Button
+              icon="pi pi-send"
+              class="self-end"
+              @click="sendMessage"
+              :disabled="isUserQueryInvalid"
+            />
           </div>
         </div>
       </div>
@@ -74,6 +158,9 @@
 </template>
 
 <script>
+import { SSE } from "sse.js";
+import emitter from "../event-bus.js";
+
 export default {
   name: "Chatbot",
 
@@ -82,7 +169,24 @@ export default {
       chatId: null,
 
       chatHistory: [],
+
+      userQuery: "",
+
+      currentMessageData: {
+        isStreaming: false,
+        human: "",
+        ai: "",
+        aiStep: null,
+      },
+
+      chatbotInvoked: false,
     };
+  },
+
+  computed: {
+    isUserQueryInvalid() {
+      return ["", null].includes(this.userQuery);
+    },
   },
 
   async mounted() {
@@ -105,6 +209,126 @@ export default {
       } catch (error) {
         console.error(error);
         this.chatHistory = [];
+      }
+    },
+
+    resetCurrentMessageData() {
+      this.currentMessageData = {
+        isStreaming: false,
+        human: "",
+        ai: "",
+        aiStep: null,
+      };
+    },
+
+    async sendMessage() {
+      if (this.isUserQueryInvalid) return;
+
+      try {
+        let url = `${this.$config.api.baseUrl}chatbot/invoke`;
+
+        let body = {
+          user_input: this.userQuery,
+          ...(this.chatId ? { chat_id: this.chatId } : {}),
+        };
+
+        this.currentMessageData.human = this.userQuery;
+        this.currentMessageData.aiStep = "Invoking chatbot";
+        this.currentMessageData.isStreaming = true;
+        this.userQuery = "";
+
+        await this.$nextTick(() => {
+          const container = this.$refs.scrollContainer;
+          const messageDiv = this.$refs.currentAIMessageContainer;
+          if (container && messageDiv) {
+            messageDiv.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+              inline: "nearest",
+            });
+          }
+        });
+
+        const isFirstMessage = this.chatId === null;
+        let newChatData = null;
+
+        const source = new SSE(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          payload: JSON.stringify(body),
+        });
+
+        const _this = this;
+
+        source.addEventListener("message", async function (e) {
+          const data = JSON.parse(e.data);
+          switch (data.type) {
+            case "step":
+              _this.currentMessageData.aiStep = data["v"]["intermediate_step"];
+              break;
+            case "stream_complete":
+              _this.chatHistory.push(JSON.parse(data["v"])["turn"]);
+              break;
+            case "chat_data":
+              if (isFirstMessage) {
+                _this.chatId = data["v"]["id"];
+                newChatData = data["v"];
+              }
+              break;
+            default:
+              console.log("Unknown event type:", data.type);
+          }
+        });
+
+        source.addEventListener("answer", function (e) {
+          const data = JSON.parse(e.data);
+          _this.currentMessageData.ai += data["v"];
+          _this.currentMessageData.aiStep = null;
+        });
+
+        source.addEventListener("readystatechange", async function (e) {
+          // When closing the stream, you should expect:
+          // A readystatechange event with a readyState of CLOSED (2);
+          if (e.readyState === 2) {
+            if (isFirstMessage) {
+              emitter.emit("new-chat", newChatData);
+              await _this.$router.replace({
+                name: "Chat",
+                params: { chatId: _this.chatId },
+              });
+            }
+
+            _this.chatbotInvoked = true;
+            _this.resetCurrentMessageData();
+          }
+        });
+
+        source.addEventListener("error", async function (e) {
+          const data = JSON.parse(e.data);
+          console.error(e);
+
+          _this.$swal({
+            title: "Prišlo je do napake!",
+            html: data.detail || data,
+            icon: "error",
+            showCloseButton: true,
+            showCancelButton: false,
+            focusConfirm: false,
+          });
+        });
+      } catch (error) {
+        console.error(error);
+        this.$swal({
+          title: "Prišlo je do napake!",
+          html: error.detail || error,
+          icon: "error",
+          showCloseButton: true,
+          showCancelButton: false,
+          focusConfirm: false,
+        });
       }
     },
   },

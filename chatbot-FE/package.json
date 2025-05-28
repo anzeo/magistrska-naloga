@@ -12,13 +12,16 @@
     "@primeuix/themes": "^1.0.3",
     "@tailwindcss/vite": "^4.1.4",
     "axios": "^1.9.0",
+    "mitt": "^3.0.1",
     "primeicons": "^7.0.0",
     "primevue": "^4.3.3",
+    "sse.js": "^2.6.0",
     "tailwindcss": "^4.1.4",
     "tailwindcss-primeui": "^0.6.1",
     "vue": "^3.5.13",
     "vue-axios": "^3.5.2",
-    "vue-router": "^4.5.0"
+    "vue-router": "^4.5.0",
+    "vue-sweetalert2": "^5.0.11"
   },
   "devDependencies": {
     "@primevue/auto-import-resolver": "^4.3.3",

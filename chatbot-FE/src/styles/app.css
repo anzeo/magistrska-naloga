@@ -23,3 +23,32 @@ html {
 
     mask-image: linear-gradient(to right, black 85%, transparent 100%);
 }
+
+.ai-step {
+    &.text-shimmer {
+        background: linear-gradient(
+                90deg,
+                #000000 0%,
+                #000000 30%,
+                #afafaf 49%,
+                #afafaf 50%,
+                #000000 70%,
+                #000000 100%
+        );
+
+        background-size: 200% 100%; /* Tighter travel range */
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shimmer-text 2s linear infinite;
+    }
+}
+
+@keyframes shimmer-text {
+    0% {
+        background-position: 150% 0;
+    }
+    100% {
+        background-position: -50% 0;
+    }
+}
+

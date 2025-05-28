@@ -3,7 +3,7 @@
     class="z-[1001] p-3 bg-gray-100 h-full shadow-xl flex-col transition-[width] duration-300 ease-in-out flex overflow-hidden"
     :class="visible ? 'w-[250px] md:relative absolute' : 'w-[64px] relative'"
   >
-    <div class="flex flex-row items-center justify-end">
+    <div class="flex flex-row items-center">
       <Button
         severity="secondary"
         icon="pi pi-bars"
@@ -12,7 +12,7 @@
       ></Button>
     </div>
 
-    <div class="mt-2 mb-3">
+    <div class="mt-2 mb-3 flex flex-row items-center">
       <Button
         severity="primary"
         class="w-full flex items-center justify-center transition-all duration-300"
@@ -122,13 +122,11 @@
     class="fixed inset-0 bg-gray-500 opacity-30 z-[1000] md:hidden block"
     @click="visible = false"
   ></div>
-
-  <Toast />
-  <ConfirmDialog></ConfirmDialog>
 </template>
 
 <script>
 import { Drawer } from "primevue";
+import emitter from "../event-bus.js";
 
 export default {
   name: "Sidebar",
@@ -161,10 +159,16 @@ export default {
   },
 
   mounted() {
+    emitter.on("new-chat", this.handleNewChat);
+
     if (this.$route.params.chatId) {
       this.activeChatId = this.$route.params.chatId;
     }
     this.getChats();
+  },
+
+  beforeUnmount() {
+    emitter.off("new-chat", this.handleNewChat);
   },
 
   methods: {
@@ -269,13 +273,13 @@ export default {
           severity: "danger",
         },
         accept: async () => {
-          if (this.activeChatId === chatId) {
-            await this.handleNewChatBtnClick();
-          }
           await this.$axios
             .delete(`${this.$config.api.baseUrl}chats/${chatId}`)
             .then(async () => {
               await this.getChats();
+              if (this.activeChatId === chatId) {
+                await this.$router.replace({ name: "Chat" });
+              }
               this.$toast.add({
                 severity: "success",
                 summary: "Akcija uspešna",
@@ -289,6 +293,10 @@ export default {
         },
         reject: () => {},
       });
+    },
+
+    handleNewChat(newChatData) {
+      this.chats.unshift(newChatData);
     },
   },
 };
