@@ -1,4 +1,4 @@
-from typing import Optional, Literal, Annotated, Union
+from typing import Optional, Literal, Annotated, Union, Dict, Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -50,18 +50,16 @@ class ChatUpdate(BaseModel):
     name: str
 
 
+class ChatHistoryTurn(BaseModel):
+    human: ChatHistoryEntry
+    ai: ChatHistoryEntry
+
+
 class InvokeChatbotRequestBody(BaseModel):
     chat_id: Optional[str] = None
     user_input: str
 
 
-class InvokeChatbotResponse(BaseModel):
-    chat_id: str
-    user_input: str
-    answer: str
-    relevant_part_texts: Optional[list] = []
-
-
-class ChatHistoryTurn(BaseModel):
-    human: ChatHistoryEntry
-    ai: ChatHistoryEntry
+class InvokeChatbotStreamingResponse(BaseModel):
+    chat: Dict[str, Any]
+    turn: ChatHistoryTurn

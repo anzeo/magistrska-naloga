@@ -1,15 +1,18 @@
+import asyncio
+import json
 from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 from pydantic import TypeAdapter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
+from starlette.responses import StreamingResponse
 
 from src.api import repository
-from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotResponse, ChatHistoryEntry, \
+from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotStreamingResponse, ChatHistoryEntry, \
     ChatHistoryTurn
 from src.core.util import get_title_from_query
 from src.db import init_db
@@ -135,6 +138,13 @@ async def delete_chat_history_by_id(chat_id: str):
         raise HTTPException(status_code=500, detail="Error deleting chat history")
 
 
+def format_sse(data: str, event: str = None) -> str:
+    msg = ""
+    if event:
+        msg += f"event: {event}\n"
+    msg += f"data: {data}\n\n"
+    return msg
+
 @app.post("/chatbot/invoke")
 async def invoke_chatbot(body: InvokeChatbotRequestBody):
     """
@@ -154,8 +164,8 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
             chat_name = get_title_from_query(user_input)
             chat_id = repository.create_chat(chat_name)
         else:
-            chat = repository.get_chat_by_id(chat_id)
-            if not chat:
+            existing_chat = repository.get_chat_by_id(chat_id)
+            if not existing_chat:
                 raise HTTPException(status_code=404, detail="Provided invalid chat_id.")
 
         # Prepare inputs for the chatbot
@@ -170,14 +180,58 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
         }
 
         config = {"configurable": {"thread_id": chat_id}}
-        chatbot_response = app.state.chatbot.invoke(inputs, config)
 
-        return InvokeChatbotResponse(
-            chat_id=chat_id,
-            user_input=user_input,
-            answer=chatbot_response["answer"],
-            relevant_part_texts=chatbot_response.get("relevant_part_texts", [])
-        )
+        async def event_stream():
+            try:
+                chat_data = repository.get_chat_by_id(chat_id)
+                yield format_sse(json.dumps({"type": "chat_data", "v": dict(chat_data)}), event="message")
+
+                chatbot_response = None
+
+                answer_to_stream = []
+
+                # Stream custom events as they arrive
+                for mode, chunk in app.state.chatbot.stream(inputs, config, stream_mode=["custom", "values", "messages"]):
+                    if mode == "custom":
+                        # Stream custom events as JSON lines
+                        yield format_sse(json.dumps({"type": "step", "v": chunk}), event="message")
+                        await asyncio.sleep(0.0)
+                    elif mode == "values":
+                        chatbot_response = chunk
+                    elif mode == "messages":
+                        msg, metadata = chunk
+                        # if metadata["langgraph_node"] == "RAG_Answer":
+                        #     if isinstance(msg, AIMessageChunk):
+                        #         answer_to_stream.append(msg.content)
+                        #     print(metadata)
+                        #     print(msg)
+                        if metadata["langgraph_node"] in ["Invalid_RAG_Answer", "LLM"]:
+                            if isinstance(msg, AIMessageChunk):
+                                answer_to_stream.append(msg.content)
+
+                # Then stream the answer
+                for chunk in answer_to_stream if len(answer_to_stream) else chatbot_response["answer"]:
+                    yield format_sse(json.dumps({"v": chunk}), event="answer")
+                    await asyncio.sleep(0.02)
+
+                chat_history_adapter = TypeAdapter(ChatHistoryEntry)
+
+                human_msg, ai_msg = chatbot_response["messages"][-2:]
+
+                validated_human_entry = chat_history_adapter.validate_python(
+                    {**human_msg.__dict__, "chat_id": chat_id})
+                validated_ai_entry = chat_history_adapter.validate_python({**ai_msg.__dict__, "chat_id": chat_id})
+
+                final_response = InvokeChatbotStreamingResponse(
+                    chat=dict(chat_data),
+                    turn=ChatHistoryTurn(human=validated_human_entry, ai=validated_ai_entry)
+                )
+
+                yield format_sse(json.dumps({"type": "stream_complete", "v": final_response.model_dump_json()}), event="message")
+            except Exception as stream_error:
+                yield format_sse(json.dumps({"error": str(stream_error)}), event="error")
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
     except HTTPException:
         raise
     except Exception as e:
