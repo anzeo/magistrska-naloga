@@ -8,7 +8,7 @@ from src.db import cursor, sqlite_conn
 
 
 def get_chats():
-    cursor.execute("SELECT * FROM chats")
+    cursor.execute("SELECT * FROM chats ORDER BY created_at DESC")
     results = cursor.fetchall()
 
     return results
