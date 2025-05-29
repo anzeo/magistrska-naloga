@@ -53,16 +53,76 @@
                       </div>
                     </div>
                   </div>
-                  <div class="flex items-start py-5">
-                    <Avatar
-                      icon="pi pi-android"
-                      class="mr-2 bg-secondary-100"
-                      shape="square"
-                    />
-                    <div class="w-full">
-                      <div class="px-2 pl-2">
-                        <div class="whitespace-pre-wrap text-base">
-                          {{ chat.ai.content }}
+                  <div class="py-5">
+                    <div class="flex items-start">
+                      <Avatar
+                        icon="pi pi-android"
+                        class="mr-2 bg-secondary-100"
+                        shape="square"
+                      />
+                      <div class="w-full">
+                        <div class="px-2 pl-2">
+                          <div class="whitespace-pre-wrap text-base">
+                            {{ chat.ai.content }}
+                          </div>
+                        </div>
+
+                        <div
+                          v-if="chat.ai.relevant_part_texts?.length"
+                          class="pt-4"
+                        >
+                          <Accordion multiple>
+                            <AccordionPanel
+                              v-for="(relevant_part, index) in chat.ai
+                                .relevant_part_texts"
+                              :value="index"
+                            >
+                              <AccordionHeader class="bg-gray-50 py-3.5">
+                                <div class="flex flex-1">
+                                  <span class="self-center">
+                                    Referenca {{ index + 1 }}
+                                  </span>
+                                  <span
+                                    class="text-xs ml-1.5 text-muted-color self-end"
+                                    style="line-height: normal"
+                                    >({{
+                                      getReferenceTitle(relevant_part)
+                                    }})</span
+                                  >
+                                </div>
+                              </AccordionHeader>
+
+                              <AccordionContent
+                                class="relevant-passage-accordion-content"
+                              >
+                                <div class="text-end mb-1">
+                                  <a
+                                    :href="`${$config.api.aiActUrl}#${relevant_part?.id}`"
+                                    target="_blank"
+                                    style="line-height: normal"
+                                    class="text-xs font-normal text-blue-600 dark:text-blue-500 hover:underline self-center"
+                                    @click.stop
+                                    >Odpri v dokumentu</a
+                                  >
+                                </div>
+                                <Card class="rounded-sm">
+                                  <template #content>
+                                    <div
+                                      v-html="
+                                        getFormattedAndMarkedVsebina(
+                                          relevant_part.full_content,
+                                          relevant_part.text,
+                                          `relevant_passage_${chat.ai.id}_${index}_${relevant_part.id}`
+                                        )
+                                      "
+                                      :id="`relevant_passage_${chat.ai.id}_${index}_${relevant_part.id}`"
+                                      class="font-mono whitespace-pre-wrap text-[13px]"
+                                    ></div>
+                                  </template>
+                                </Card>
+                              </AccordionContent>
+                            </AccordionPanel>
+                          </Accordion>
                         </div>
                       </div>
                     </div>
@@ -160,6 +220,8 @@
 <script>
 import { SSE } from "sse.js";
 import emitter from "../event-bus.js";
+import { Accordion } from "primevue";
+import Mark from "mark.js";
 
 export default {
   name: "Chatbot",
@@ -271,6 +333,7 @@ export default {
               break;
             case "stream_complete":
               _this.chatHistory.push(JSON.parse(data["v"])["turn"]);
+              _this.$forceUpdate();
               break;
             case "chat_data":
               if (isFirstMessage) {
@@ -312,7 +375,7 @@ export default {
 
           _this.$swal({
             title: "Prišlo je do napake!",
-            html: data.detail || data,
+            html: data.error || data,
             icon: "error",
             showCloseButton: true,
             showCancelButton: false,
@@ -331,8 +394,53 @@ export default {
         });
       }
     },
+
+    getFormattedAndMarkedVsebina(full_content, relevant_parts, elementId) {
+      if (!full_content) {
+        return "";
+      }
+
+      let instance = new Mark(document.getElementById(elementId));
+      instance.mark(relevant_parts, {
+        value: "exactly",
+        separateWordSearch: false,
+      });
+
+      if (full_content.id_elementa.includes("art_")) {
+        // Check if this is a Člen (article)
+        return `<div class="text-center"><i>Člen ${full_content.id_elementa.replace(
+          "art_",
+          ""
+        )}</i></div>\n<div class="text-center font-bold">${
+          full_content.naslov
+        }</div>\n${full_content.vsebina}`;
+      } else if (full_content.id_elementa.includes("rct_")) {
+        // Check if this is a Točka (point)
+        return `<div class="text-center"><i>(${full_content.id_elementa.replace(
+          "rct_",
+          ""
+        )})</i></div>\n${full_content.vsebina}`;
+      }
+    },
+
+    getReferenceTitle(relevant_part) {
+      if (relevant_part.id.includes("art_")) {
+        // Check if this is a Člen (article)
+        return `Člen ${relevant_part.id.replace("art_", "")}`;
+      } else if (relevant_part.id.includes("rct_")) {
+        // Check if this is a Točka (point)
+        return `Točka ${relevant_part.id.replace("rct_", "")}`;
+      }
+      return "Referenca";
+    },
   },
 };
 </script>
 
-<style scoped></style>
+<style>
+.relevant-passage-accordion-content {
+  .p-accordioncontent-content {
+    background: var(--color-gray-50);
+  }
+}
+</style>

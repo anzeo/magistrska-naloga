@@ -43,6 +43,10 @@ html {
     }
 }
 
+mark {
+    background: rgb(255, 218, 144);
+}
+
 @keyframes shimmer-text {
     0% {
         background-position: 150% 0;
