@@ -77,7 +77,9 @@
                                 .relevant_part_texts"
                               :value="index"
                             >
-                              <AccordionHeader class="bg-gray-50 py-3.5">
+                              <AccordionHeader
+                                class="bg-gray-50 py-3.5 hover:bg-gray-100"
+                              >
                                 <div class="flex flex-1">
                                   <span class="self-center">
                                     Referenca {{ index + 1 }}
@@ -375,7 +377,7 @@ export default {
 
           _this.$swal({
             title: "Prišlo je do napake!",
-            html: data.error || data,
+            html: data.error || data.detail || data,
             icon: "error",
             showCloseButton: true,
             showCancelButton: false,
