@@ -53,7 +53,7 @@ class RelevantPassage(BaseModel):
 class RAGAnswerParser(BaseModel):
     Answer: str = Field(description='Odgovor pridobljen iz konteksta')
     RelevantParts: list[RelevantPassage] = Field(
-        description='Seznam odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])')
+        description='Seznam dobesedno prepisanih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])')
 
 
 class AnswerValidationParser(BaseModel):
@@ -372,8 +372,8 @@ def rag_answer_function(state):
         - Če dokumenti ne vsebujejo dovolj informacij za smiseln odgovor, vrni le prazen niz za polje "Answer".
         
         Poleg samega odgovora vrni tudi seznam najpomembnejših odlomkov iz dokumentov, ki so neposredno pripomogli k oblikovanju odgovora. Vsak odlomek mora biti:
-        - **Dobesedno prepisan iz dokumenta**, brez sprememb, povzemanja ali sklepanja.
         - Označen z `id` dokumenta, iz katerega izvira.
+        - **Dobesedno prepisan iz dokumenta**, brez kakršnih koli sprememb, okrajšav, povzemanj ali preoblikovanj. Pomembno je tudi, da ločila, razmiki ali prelomi vrstic ostanejo takšni kot so.
         
         ---
         

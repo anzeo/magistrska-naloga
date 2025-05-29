@@ -4,16 +4,16 @@ from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 from pydantic import TypeAdapter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
-from starlette.responses import StreamingResponse
 
 from src.api import repository
 from src.api.models import ChatUpdate, InvokeChatbotRequestBody, InvokeChatbotStreamingResponse, ChatHistoryEntry, \
     ChatHistoryTurn
+from src.api.util import format_sse, get_ai_act_part_by_id
 from src.core.util import get_title_from_query
 from src.db import init_db
 
@@ -122,6 +122,12 @@ async def get_chat_history(chat_id: str) -> List[ChatHistoryTurn]:
                     {**human_messages[parent_id].__dict__, "chat_id": chat_id})
                 validated_ai_entry = chat_history_adapter.validate_python({**ai_msg.__dict__, "chat_id": chat_id})
 
+                if len(getattr(validated_ai_entry, "relevant_part_texts", [])) > 0:
+                    # If there are relevant parts, fetch their full content
+                    for part in validated_ai_entry.relevant_part_texts:
+                        part_id = part.get("id", None)
+                        part["full_content"] = get_ai_act_part_by_id(part_id)
+
                 paired_history.append(ChatHistoryTurn(human=validated_human_entry, ai=validated_ai_entry))
 
         return paired_history
@@ -137,13 +143,6 @@ async def delete_chat_history_by_id(chat_id: str):
     except Exception:
         raise HTTPException(status_code=500, detail="Error deleting chat history")
 
-
-def format_sse(data: str, event: str = None) -> str:
-    msg = ""
-    if event:
-        msg += f"event: {event}\n"
-    msg += f"data: {data}\n\n"
-    return msg
 
 @app.post("/chatbot/invoke")
 async def invoke_chatbot(body: InvokeChatbotRequestBody):
@@ -221,6 +220,12 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
                 validated_human_entry = chat_history_adapter.validate_python(
                     {**human_msg.__dict__, "chat_id": chat_id})
                 validated_ai_entry = chat_history_adapter.validate_python({**ai_msg.__dict__, "chat_id": chat_id})
+
+                if len(getattr(validated_ai_entry, "relevant_part_texts", [])) > 0:
+                    validated_ai_entry.relevant_part_texts = [
+                        {**part.__dict__, "full_content": get_ai_act_part_by_id(getattr(part, "id", None))}
+                        for part in validated_ai_entry.relevant_part_texts
+                    ]
 
                 final_response = InvokeChatbotStreamingResponse(
                     chat=dict(chat_data),
