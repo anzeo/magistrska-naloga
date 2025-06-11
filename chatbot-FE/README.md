@@ -1,5 +1,35 @@
-# Vue 3 + Vite
+# Uporabniški vmesnik pogovornega robota
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Ta direktorij vsebuje kodo uporabniškega vmesnika za pogovornega robota, specializiranega za svetovanje v zvezi z **Evropskim aktom o umetni inteligenci (AI Act)**.
+Aplikacija omogoča enostavno in intuitivno interakcijo s sistemom prek spletnega vmesnika.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+---
+
+## Zahteve za zagon
+
+* **Node.js**: `v22.4.0`
+* **npm**: `v10.8.1`
+
+> **Pomembno:** Pred zagonom je potrebno imeti aktivno verzijo `Node.js 22.4.0` in ustrezen `npm 10.8.1`. Priporočena je uporaba
+> orodja `nvm` za lažje upravljanje verzij.
+
+---
+
+## Zagon aplikacije
+
+1. **Namestitev vseh odvisnosti:**
+
+```bash
+npm install
+```
+
+2. **Zagon aplikacije:**
+
+```bash
+npm run dev
+```
+
+Po zagonu bo aplikacija dostopna na naslovu `http://localhost:5173/`.
+
+> **Opomba:** Za pravilno delovanje mora biti zagnan tudi **zaledni del** aplikacije (backend). Navodila za njegov zagon
+> se nahajajo v mapi [`PROJECT_ROOT/chatbot/`](../chatbot/).
