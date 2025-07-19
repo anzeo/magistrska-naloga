@@ -28,7 +28,8 @@ class MemoryType(str, Enum):
 # ----------------------------------------------
 
 # chat_model = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0, verbose=True)
-chat_model = ChatOpenAI(model="gpt-4o-mini", temperature=0, verbose=True)
+decision_model = ChatOpenAI(model="gpt-4o-mini", temperature=0, verbose=True)
+answer_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.4, verbose=True)
 
 
 class Top3Response(BaseModel):
@@ -46,8 +47,10 @@ class QueryClassificationParser(BaseModel):
 
 
 class RelevantPassage(BaseModel):
-    id: str
-    text: list[str]
+    id: str = Field(description='ID dokumenta, iz katerega izvira seznam odlomkov')
+    text: list[str] = Field(
+        description='Seznam dobesedno prepisanih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])'
+    )
 
 
 class RAGAnswerParser(BaseModel):
@@ -59,6 +62,10 @@ class RAGAnswerParser(BaseModel):
 class AnswerValidationParser(BaseModel):
     AnswerValid: str = Field(description="Odločitev ali je odgovor zadosten glede na zastavljeno vprašanje")
     Reasoning: str = Field(description="Utemeljitev za podano odločitev")
+
+
+class RAGAnswerRelevantPassages(BaseModel):
+    RelevantPassages: list[RelevantPassage] = Field(description='Seznam dobesedno prepisanih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])')
 
 
 class AgentState(TypedDict):
@@ -78,6 +85,7 @@ query_classification_parser = PydanticOutputParser(pydantic_object=QueryClassifi
 top_3_parser = PydanticOutputParser(pydantic_object=Top3Response)
 rag_answer_parser = PydanticOutputParser(pydantic_object=RAGAnswerParser)
 answer_validation_parser = PydanticOutputParser(pydantic_object=AnswerValidationParser)
+rag_answer_relevant_passages_parser = PydanticOutputParser(pydantic_object=RAGAnswerRelevantPassages)
 
 
 def serialize_chat_history(messages):
@@ -164,7 +172,7 @@ def classify_query_relevance(state):
     #     query
     # ])
 
-    chain = prompt | chat_model | query_classification_parser
+    chain = prompt | decision_model | query_classification_parser
 
     resp = chain.invoke({
         "query": query.content,
@@ -236,7 +244,7 @@ def rephrase_query(state):
 
     prompt = PromptTemplate.from_template(template)
 
-    chain = prompt | chat_model | StrOutputParser()
+    chain = prompt | decision_model | StrOutputParser()
 
     resp = chain.invoke({
         "query": query.content,
@@ -302,7 +310,7 @@ def rag_function(state):
                 "query": lambda x: x
             }
             | prompt
-            | chat_model
+            | decision_model
             | top_3_parser
     )
 
@@ -344,7 +352,7 @@ def llm_function(state):
         # ("human", "{query}")
     ])
 
-    chain = prompt | chat_model | StrOutputParser()
+    chain = prompt | answer_model | StrOutputParser()
 
     response = chain.invoke({"chat_history": chat_history, "query": query})
 
@@ -363,49 +371,78 @@ def rag_answer_function(state):
     query = state["query"]
     original_query = state["messages"][-1]
 
+    # template = """
+    #     Spodaj so podani dokumenti, ki naj bi bili najbolj relevantni glede na uporabnikovo vprašanje. Na njihovi podlagi oblikuj razumljiv odgovor na uporabnikovo vprašanje.
+    #
+    #     **Pomembno:**
+    #     - Odgovora ne oblikuj na podlagi nobenih drugih virov ali zunanjega znanja.
+    #     - Uporabi zgolj znanje iz spodaj navedenih dokumentov in nikakor ne sklepaj na podlagi lastnih predpostavk ali informacij, ki niso v dokumentih.
+    #     - Če dokumenti ne vsebujejo dovolj informacij za smiseln odgovor, vrni le prazen niz za polje "Answer".
+    #
+    #     Poleg samega odgovora vrni tudi seznam najpomembnejših odlomkov iz dokumentov, ki so neposredno pripomogli k oblikovanju odgovora. Vsak odlomek mora biti:
+    #     - Označen z `id` dokumenta, iz katerega izvira.
+    #     - **Dobesedno prepisan iz dokumenta**, brez kakršnih koli sprememb, okrajšav, povzemanj ali preoblikovanj. Pomembno je tudi, da ločila, razmiki ali prelomi vrstic ostanejo takšni kot so.
+    #
+    #     ---
+    #
+    #     Uporabnikov poziv (izvoren):
+    #     <originalen_poziv>
+    #     {original_query}
+    #     </originalen_poziv>
+    #
+    #     Preoblikovan poziv (optimiziran za iskanje):
+    #     <preoblikovan_poziv>
+    #     {query}
+    #     </preoblikovan_poziv>
+    #
+    #     ---
+    #
+    #     Relevantni dokumenti v pomoč pri tvorjenju odgovora:
+    #     <dokumenti>
+    #     {top_3}
+    #     </dokumenti>
+    #
+    #     ---
+    #
+    #     Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
+    #
+    #     Navodila za strukturiranje odgovora:
+    #     {format_instructions}
+    # """
+
     template = """
         Spodaj so podani dokumenti, ki naj bi bili najbolj relevantni glede na uporabnikovo vprašanje. Na njihovi podlagi oblikuj razumljiv odgovor na uporabnikovo vprašanje.
-        
+
         **Pomembno:** 
         - Odgovora ne oblikuj na podlagi nobenih drugih virov ali zunanjega znanja. 
         - Uporabi zgolj znanje iz spodaj navedenih dokumentov in nikakor ne sklepaj na podlagi lastnih predpostavk ali informacij, ki niso v dokumentih.
-        - Če dokumenti ne vsebujejo dovolj informacij za smiseln odgovor, vrni le prazen niz za polje "Answer".
-        
-        Poleg samega odgovora vrni tudi seznam najpomembnejših odlomkov iz dokumentov, ki so neposredno pripomogli k oblikovanju odgovora. Vsak odlomek mora biti:
-        - Označen z `id` dokumenta, iz katerega izvira.
-        - **Dobesedno prepisan iz dokumenta**, brez kakršnih koli sprememb, okrajšav, povzemanj ali preoblikovanj. Pomembno je tudi, da ločila, razmiki ali prelomi vrstic ostanejo takšni kot so.
-        
+        - Če dokumenti ne vsebujejo dovolj informacij za smiseln odgovor, vrni le prazen niz.
+
         ---
-        
+
         Uporabnikov poziv (izvoren):
         <originalen_poziv>
         {original_query}
         </originalen_poziv>
-        
+
         Preoblikovan poziv (optimiziran za iskanje):
         <preoblikovan_poziv>
         {query}
         </preoblikovan_poziv>
 
         ---
-        
+
         Relevantni dokumenti v pomoč pri tvorjenju odgovora:
         <dokumenti>
         {top_3}
         </dokumenti>
-        
+
         ---
-
-        Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
-
-        Navodila za strukturiranje odgovora:
-        {format_instructions}
     """
 
-    prompt = PromptTemplate(template=template, input_variables=["original_query", "query", "top_3"]).partial(
-        format_instructions=rag_answer_parser.get_format_instructions())
+    prompt = PromptTemplate(template=template, input_variables=["original_query", "query", "top_3"])
 
-    chain = prompt | chat_model | rag_answer_parser
+    chain = prompt | answer_model | StrOutputParser()
 
     response = chain.invoke(
         {"original_query": original_query.content, "query": query, "top_3": get_context(state["top_3"])})
@@ -419,7 +456,7 @@ def rag_answer_function(state):
     #     print("Relevant Parts:", relevant_passage.text)
     # print()
 
-    return {"answer": response.Answer, "relevant_part_texts": response.RelevantParts}
+    return {"answer": response}
 
 
 def validate_answer(state):
@@ -472,7 +509,7 @@ def validate_answer(state):
         template=template
     )
 
-    chain = prompt | chat_model | answer_validation_parser
+    chain = prompt | decision_model | answer_validation_parser
 
     response = chain.invoke({"answer": answer, "query": query, "original_query": original_query.content})
 
@@ -494,7 +531,7 @@ def invalid_rag_answer(state):
         ("human", "{query}")
     ])
 
-    chain = prompt | chat_model | StrOutputParser()
+    chain = prompt | answer_model | StrOutputParser()
 
     response = chain.invoke({"query": query})
 
@@ -507,15 +544,71 @@ def invalid_rag_answer(state):
 
 
 def valid_rag_answer(state):
-    print("-- Appending Valid RAG Answer To Chat History --")
+    print("-- Getting Relevant Passages And Appending Valid RAG Answer To Chat History --")
+    writer = get_stream_writer()
+    writer({"intermediate_step": "Getting Relevant Passages And Appending Valid RAG Answer To Chat History"})
 
     valid_answer = state["answer"]
-    relevant_part_texts = state["relevant_part_texts"]
     human_msg_id = state["messages"][-1].id
+
+    query = state["query"]
+    original_query = state["messages"][-1]
+
+    template = """
+        Spodaj so podani dokumenti, ki so bili v pomoč pri generiranju odgovora na uporabnikov poziv. Uporabi dokumente in iz njih pridobi seznam najpomembnejših odlomkov, ki so neposredno pripomogli k oblikovanju odgovora. 
+        Vsak odlomek mora biti:
+            - **Dobesedno prepisan iz dokumenta**, brez kakršnih koli sprememb, okrajšav, povzemanj ali preoblikovanj.
+            - Odlomki **lahko vključujejo samo del stavka** ali posamezne fraze — ni potrebno, da so zaključene povedi.
+            - Pomembno je tudi, da ločila, razmiki ali prelomi vrstic ostanejo takšni kot so v izvirnem dokumentu.
+            
+        ---
+        
+        Relevantni dokumenti v pomoč pri tvorjenju odgovora:
+        <dokumenti>
+        {top_3}
+        </dokumenti>
+        
+        ---
+
+        Uporabnikov poziv (izvoren):
+        <originalen_poziv>
+        {original_query}
+        </originalen_poziv>
+
+        Preoblikovan poziv (optimiziran za iskanje):
+        <preoblikovan_poziv>
+        {query}
+        </preoblikovan_poziv>
+
+        ---
+
+        Odgovor:
+        <odgovor>
+        {answer}
+        </odgovor>
+
+        ---
+
+        Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
+
+        Pričakovana struktura odgovora:
+        {format_instructions}
+        """
+
+    prompt = PromptTemplate(
+        input_variables=["answer", "query", "original_query", "top_3"],
+        partial_variables={"format_instructions": rag_answer_relevant_passages_parser.get_format_instructions()},
+        template=template
+    )
+
+    chain = prompt | decision_model | rag_answer_relevant_passages_parser
+
+    response = chain.invoke({"answer": valid_answer, "query": query, "original_query": original_query.content, "top_3": get_context(state["top_3"])})
 
     return {
         # Append valid RAG answer to chat history
-        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": relevant_part_texts},
+        "relevant_part_texts": response.RelevantPassages,
+        "messages": [AIMessage(content=valid_answer, response_metadata={"relevant_part_texts": response.RelevantPassages},
                                additional_kwargs={"parent_id": human_msg_id})]
     }
 
