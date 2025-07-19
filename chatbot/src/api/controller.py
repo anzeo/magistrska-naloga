@@ -234,7 +234,8 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
                                     answer_to_stream.append(msg.content)
 
                     # Then stream the answer
-                    for chunk in (answer_to_stream if chatbot_response["valid_rag_answer"] == "Invalid" else rag_answer_to_stream):
+                    for chunk in (rag_answer_to_stream if (
+                            chatbot_response["valid_rag_answer"] == "Valid") else answer_to_stream):
                         yield format_sse(json.dumps({"v": chunk}), event="answer")
                         await asyncio.sleep(0.02)
 
