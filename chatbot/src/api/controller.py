@@ -193,6 +193,7 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
 
                     chatbot_response = None
 
+                    rag_answer_to_stream = []
                     answer_to_stream = []
 
                     queue = asyncio.Queue()
@@ -225,17 +226,15 @@ async def invoke_chatbot(body: InvokeChatbotRequestBody):
                             chatbot_response = chunk
                         elif mode == "messages":
                             msg, metadata = chunk
-                            # if metadata["langgraph_node"] == "RAG_Answer":
-                            #     if isinstance(msg, AIMessageChunk):
-                            #         answer_to_stream.append(msg.content)
-                            #     print(metadata)
-                            #     print(msg)
+                            if metadata["langgraph_node"] in ["RAG_Answer"]:
+                                if isinstance(msg, AIMessageChunk):
+                                    rag_answer_to_stream.append(msg.content)
                             if metadata["langgraph_node"] in ["Invalid_RAG_Answer", "LLM"]:
                                 if isinstance(msg, AIMessageChunk):
                                     answer_to_stream.append(msg.content)
 
                     # Then stream the answer
-                    for chunk in answer_to_stream if len(answer_to_stream) else chatbot_response["answer"]:
+                    for chunk in (answer_to_stream if chatbot_response["valid_rag_answer"] == "Invalid" else rag_answer_to_stream):
                         yield format_sse(json.dumps({"v": chunk}), event="answer")
                         await asyncio.sleep(0.02)
 
