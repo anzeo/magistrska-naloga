@@ -71,7 +71,7 @@
                           v-if="chat.ai.relevant_part_texts?.length"
                           class="pt-4"
                         >
-                          <Accordion multiple>
+                          <Accordion multiple @tab-open="e => markVsebina(e, chat.ai)">
                             <AccordionPanel
                               v-for="(relevant_part, index) in chat.ai
                                 .relevant_part_texts"
@@ -111,11 +111,7 @@
                                   <template #content>
                                     <div
                                       v-html="
-                                        getFormattedAndMarkedVsebina(
-                                          relevant_part.full_content,
-                                          relevant_part.text,
-                                          `relevant_passage_${chat.ai.id}_${index}_${relevant_part.id}`
-                                        )
+                                        getFormattedVsebina( relevant_part.full_content)
                                       "
                                       :id="`relevant_passage_${chat.ai.id}_${index}_${relevant_part.id}`"
                                       class="font-mono whitespace-pre-wrap text-[13px]"
@@ -197,7 +193,7 @@
             class="bg-white border rounded-3xl border-gray-400 p-4 flex items-center gap-3 shadow-md"
           >
             <Textarea
-              v-model.trim="userQuery"
+              v-model="userQuery"
               @keydown.enter.exact.prevent="sendMessage"
               rows="1"
               autoResize
@@ -249,7 +245,7 @@ export default {
 
   computed: {
     isUserQueryInvalid() {
-      return ["", null].includes(this.userQuery);
+      return ["", null].includes(this.userQuery?.trim());
     },
   },
 
@@ -292,11 +288,11 @@ export default {
         let url = `${this.$config.api.baseUrl}chatbot/invoke`;
 
         let body = {
-          user_input: this.userQuery,
+          user_input: this.userQuery.trim(),
           ...(this.chatId ? { chat_id: this.chatId } : {}),
         };
 
-        this.currentMessageData.human = this.userQuery;
+        this.currentMessageData.human = this.userQuery.trim();
         this.currentMessageData.aiStep = "Invoking chatbot";
         this.currentMessageData.isStreaming = true;
         this.userQuery = "";
@@ -397,16 +393,10 @@ export default {
       }
     },
 
-    getFormattedAndMarkedVsebina(full_content, relevant_parts, elementId) {
+    getFormattedVsebina(full_content) {
       if (!full_content) {
         return "";
       }
-
-      let instance = new Mark(document.getElementById(elementId));
-      instance.mark(relevant_parts, {
-        value: "exactly",
-        separateWordSearch: false,
-      });
 
       if (full_content.id_elementa.includes("art_")) {
         // Check if this is a Člen (article)
@@ -435,6 +425,21 @@ export default {
       }
       return "Referenca";
     },
+
+    markVsebina(e, aiChat) {
+      let index = e?.index ?? null
+      let relevant_part = aiChat?.relevant_part_texts?.[index] ?? null
+      if (index !== null && relevant_part !== null) {
+        let relevant_part_texts = relevant_part.text;
+        let elementId = `relevant_passage_${aiChat.id}_${index}_${relevant_part.id}`
+
+        let instance = new Mark(document.getElementById(elementId));
+        instance.mark(relevant_part_texts, {
+          value: "exactly",
+          separateWordSearch: false,
+        });
+      }
+    }
   },
 };
 </script>
