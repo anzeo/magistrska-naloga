@@ -2,7 +2,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-chat_model = ChatOpenAI(model="gpt-4o-mini", temperature=0, verbose=True)
+chat_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.4, verbose=True)
 
 
 def get_title_from_query(query):
