@@ -2,6 +2,7 @@ from enum import Enum
 from typing import TypedDict, Annotated
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
+from langchain_core.messages.utils import count_tokens_approximately, trim_messages
 from langchain_core.output_parsers import PydanticOutputParser, StrOutputParser
 from langchain_core.prompts import PromptTemplate, MessagesPlaceholder, ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
@@ -103,7 +104,14 @@ def classify_query_relevance(state):
     writer = get_stream_writer()
     writer({"intermediate_step": "Checking query relevance with AI Act"})
 
-    chat_history = state["messages"][:-1]
+    chat_history = trim_messages(
+        state["messages"][:-1],
+        strategy="last",
+        token_counter=count_tokens_approximately,
+        max_tokens=4096,
+        start_on="human",
+        end_on="ai",
+    )
     query = state["messages"][-1]  # HumanMessage(content="...")
 
     template = """
@@ -207,7 +215,14 @@ def rephrase_query(state):
     writer = get_stream_writer()
     writer({"intermediate_step": "Rephrasing user query into more suitable form for usage in RAG"})
 
-    chat_history = state["messages"][:-1]
+    chat_history = trim_messages(
+        state["messages"][:-1],
+        strategy="last",
+        token_counter=count_tokens_approximately,
+        max_tokens=4096,
+        start_on="human",
+        end_on="ai",
+    )
     query = state["messages"][-1]  # HumanMessage(content="...")
 
     template = """
@@ -338,7 +353,14 @@ def llm_function(state):
     writer = get_stream_writer()
     writer({"intermediate_step": "Calling LLM"})
 
-    chat_history = state["messages"][:-1]
+    chat_history = trim_messages(
+        state["messages"][:-1],
+        strategy="last",
+        token_counter=count_tokens_approximately,
+        max_tokens=8192,
+        start_on="human",
+        end_on="ai",
+    )
     query = state["messages"][-1]
     human_msg_id = query.id
 
