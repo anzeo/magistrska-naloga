@@ -48,11 +48,20 @@ class QueryClassificationParser(BaseModel):
 
 
 class RelevantPassage(BaseModel):
-    id: str = Field(description='ID dokumenta, iz katerega izvira seznam odlomkov')
-    text: list[str] = Field(
-        description='Seznam dobesedno prepisanih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])'
-    )
-
+    id: Annotated[
+        str,
+        Field(
+            title="Id",
+            description="ID dokumenta, iz katerega izvira seznam odlomkov"
+        )
+    ]
+    text: Annotated[
+        list[str],
+        Field(
+            title="Text",
+            description="Seznam dobesedno prekopiranih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])"
+        )
+    ]
 
 class RAGAnswerParser(BaseModel):
     Answer: str = Field(description='Odgovor pridobljen iz konteksta')
@@ -66,8 +75,13 @@ class AnswerValidationParser(BaseModel):
 
 
 class RAGAnswerRelevantPassages(BaseModel):
-    RelevantPassages: list[RelevantPassage] = Field(description='Seznam dobesedno prepisanih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])')
-
+    RelevantPassages: Annotated[
+        list[RelevantPassage],
+        Field(
+            title="Relevantpassages",
+            description="Seznam dobesedno prekopiranih odlomkov iz dokumenta, ki podpirajo odgovor (ali prazen seznam [])"
+        )
+    ]
 
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
@@ -342,9 +356,13 @@ def rag_function(state):
 
 def get_context(retrieved_docs: list[Document]):
     context = "\n\n".join([
-        f"ID: {doc.metadata['id']}\nVsebina:\n{doc.page_content}"
+        f"<dokument>\n<id>{doc.metadata['id']}</id>\n<besedilo>\n{doc.page_content}\n</besedilo>\n</dokument>"
         for doc in retrieved_docs
     ])
+    # context = "\n\n".join([
+    #     f"ID: {doc.metadata['id']}\nVsebina:\n{doc.page_content}"
+    #     for doc in retrieved_docs
+    # ])
     return context
 
 
@@ -576,13 +594,63 @@ def valid_rag_answer(state):
     query = state["query"]
     original_query = state["messages"][-1]
 
+    # template = """
+    #     Spodaj so podani dokumenti, ki so bili v pomoč pri generiranju odgovora na uporabnikov poziv. Uporabi dokumente in iz njih pridobi seznam najpomembnejših odlomkov, ki so neposredno pripomogli k oblikovanju odgovora.
+    #     Vsak odlomek mora biti:
+    #         - **Dobesedno prepisan iz dokumenta**, brez kakršnih koli sprememb, okrajšav, povzemanj ali preoblikovanj.
+    #         - Odlomki **lahko vključujejo samo del stavka** ali posamezne fraze — ni potrebno, da so zaključene povedi.
+    #         - Pomembno je tudi, da ločila, razmiki ali prelomi vrstic ostanejo takšni kot so v izvirnem dokumentu.
+    #
+    #     ---
+    #
+    #     Relevantni dokumenti v pomoč pri tvorjenju odgovora:
+    #     <dokumenti>
+    #     {top_3}
+    #     </dokumenti>
+    #
+    #     ---
+    #
+    #     Uporabnikov poziv (izvoren):
+    #     <originalen_poziv>
+    #     {original_query}
+    #     </originalen_poziv>
+    #
+    #     Preoblikovan poziv (optimiziran za iskanje):
+    #     <preoblikovan_poziv>
+    #     {query}
+    #     </preoblikovan_poziv>
+    #
+    #     ---
+    #
+    #     Odgovor:
+    #     <odgovor>
+    #     {answer}
+    #     </odgovor>
+    #
+    #     ---
+    #
+    #     Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
+    #
+    #     Pričakovana struktura odgovora:
+    #     {format_instructions}
+    #     """
+
     template = """
-        Spodaj so podani dokumenti, ki so bili v pomoč pri generiranju odgovora na uporabnikov poziv. Uporabi dokumente in iz njih pridobi seznam najpomembnejših odlomkov, ki so neposredno pripomogli k oblikovanju odgovora. 
-        Vsak odlomek mora biti:
-            - **Dobesedno prepisan iz dokumenta**, brez kakršnih koli sprememb, okrajšav, povzemanj ali preoblikovanj.
-            - Odlomki **lahko vključujejo samo del stavka** ali posamezne fraze — ni potrebno, da so zaključene povedi.
-            - Pomembno je tudi, da ločila, razmiki ali prelomi vrstic ostanejo takšni kot so v izvirnem dokumentu.
-            
+        Spodaj so podani dokumenti, ki so bili v pomoč pri generiranju odgovora na uporabnikov poziv. Tvoja naloga je, da iz teh dokumentov izbereš tiste **dobesedne odlomke**, ki so **neposredno vplivali na oblikovanje odgovora**.
+
+        Za vsak dokument, iz katerega je bil uporabljen odlomek, navedi:
+        - njegov ID (`id`)
+        - seznam dobesedno prekopiranih odlomkov (`text`), brez okrajšav, parafraziranja ali povzemanja
+        
+        Pomembno:
+        - Odlomki so lahko **celotni stavki ali samo deli stavkov**
+        - **Ne smeš spreminjati ločil, presledkov ali vrstic** – ohrani besedilo točno tako, kot se pojavi v dokumentu
+        - Odlomke moraš **kopirati neposredno iz podanih dokumentov (copy-paste)** – ne smeš jih ponovno vnašati ali prilagajati
+        - Če določen dokument ni vplival na odgovor, ga ne vključi
+        
+        Vrni izhod v naslednji JSON obliki:
+        {format_instructions}
+
         ---
         
         Relevantni dokumenti v pomoč pri tvorjenju odgovora:
@@ -590,32 +658,21 @@ def valid_rag_answer(state):
         {top_3}
         </dokumenti>
         
-        ---
-
         Uporabnikov poziv (izvoren):
         <originalen_poziv>
         {original_query}
         </originalen_poziv>
-
+        
         Preoblikovan poziv (optimiziran za iskanje):
         <preoblikovan_poziv>
         {query}
         </preoblikovan_poziv>
-
-        ---
-
+        
         Odgovor:
         <odgovor>
         {answer}
         </odgovor>
-
-        ---
-
-        Vedno moraš vrniti veljaven JSON, obdan z blokom kode Markdown. Ne vračaj nobenega dodatnega besedila.
-
-        Pričakovana struktura odgovora:
-        {format_instructions}
-        """
+    """
 
     prompt = PromptTemplate(
         input_variables=["answer", "query", "original_query", "top_3"],
