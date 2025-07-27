@@ -354,6 +354,8 @@ export default {
           // When closing the stream, you should expect:
           // A readystatechange event with a readyState of CLOSED (2);
           if (e.readyState === 2) {
+            source.close();
+
             if (isFirstMessage) {
               emitter.emit("new-chat", newChatData);
               await _this.$router.replace({
@@ -379,6 +381,8 @@ export default {
             showCancelButton: false,
             focusConfirm: false,
           });
+
+          source.close();
         });
       } catch (error) {
         console.error(error);
