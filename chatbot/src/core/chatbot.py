@@ -636,42 +636,36 @@ def valid_rag_answer(state):
     #     """
 
     template = """
-        Spodaj so podani dokumenti, ki so bili v pomoč pri generiranju odgovora na uporabnikov poziv. Tvoja naloga je, da iz teh dokumentov izbereš tiste **dobesedne odlomke**, ki so **neposredno vplivali na oblikovanje odgovora**.
+        Spodaj so podani dokumenti, ki so bili uporabljeni za generiranje odgovora. Tvoja naloga je:
 
-        Za vsak dokument, iz katerega je bil uporabljen odlomek, navedi:
-        - njegov ID (`id`)
-        - seznam dobesedno prekopiranih odlomkov (`text`), brez okrajšav, parafraziranja ali povzemanja
+        1. **PREBERI DOKUMENTE** - Spodaj v sekciji <dokumenti> so navedeni vsi razpoložljivi dokumenti
+        2. **IDENTIFICIRAJ RELEVANTNE DELE** - Poišči dele dokumentov, ki pripomorejo k generiranju odgovora
+        3. **KOPIRAJ DOBESEDNO** - Kopiraj relevantne dele DIREKTNO iz dokumentov (ne iz odgovora!)
         
-        Pomembno:
-        - Odlomki so lahko **celotni stavki ali samo deli stavkov**
-        - **Ne smeš spreminjati ločil, presledkov ali vrstic** – ohrani besedilo točno tako, kot se pojavi v dokumentu
-        - Odlomke moraš **kopirati neposredno iz podanih dokumentov (copy-paste)** – ne smeš jih ponovno vnašati ali prilagajati
-        - Če določen dokument ni vplival na odgovor, ga ne vključi
-        
-        Vrni izhod v naslednji JSON obliki:
-        {format_instructions}
+        **PRAVILA ZA KOPIRANJE:**
+        - Kopiraj besedilo TOČNO tako kot je v dokumentu - z vsemi ločili, presledki, velikimi/malimi črkami
+        - NE povzemaj, NE parafraziraj, NE krajšaj
+        - NE kopiraj iz odgovora - SAMO iz dokumentov!
+        - Če dokument ni bil uporabljen, ga ne vključi
 
         ---
         
-        Relevantni dokumenti v pomoč pri tvorjenju odgovora:
+        RAZPOLOŽLJIVI DOKUMENTI:
         <dokumenti>
         {top_3}
         </dokumenti>
         
-        Uporabnikov poziv (izvoren):
-        <originalen_poziv>
-        {original_query}
-        </originalen_poziv>
+        ---
         
-        Preoblikovan poziv (optimiziran za iskanje):
-        <preoblikovan_poziv>
-        {query}
-        </preoblikovan_poziv>
+        KONTEKST UPORABE:
+        Uporabnikov poziv: "{original_query}"
+        Preoblikovan poziv: "{query}"
+        Generiran odgovor: "{answer}"
         
-        Odgovor:
-        <odgovor>
-        {answer}
-        </odgovor>
+        ---
+        
+        ZAHTEVANA OBLIKA IZHODA:
+        {format_instructions}
     """
 
     prompt = PromptTemplate(
